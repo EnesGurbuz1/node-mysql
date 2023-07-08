@@ -1,17 +1,22 @@
-// const { buildSchema } = require('graphql');
+const { gql } = require('apollo-server-express');
 
-// // GraphQL şemasını oluşturun
-// const schema = buildSchema(`
-//   type User {
-//     id: Int
-//     name: String
-//     email: String
-//   }
+// GraphQL şema tanımları
+const typeDefs = gql`
+  type User {
+    id: Int
+    name: String
+    email: String
+  }
 
-//   type Query {
-//     getUser(id: Int): User
-//     getUsers: [User] 
-//   }
-// `);
+  type Query {
+    getUser(id: Int): User
+    getUsers: [User]
+  }
 
-// module.exports = schema;
+    type Mutation {
+    addUser(id: Int!, name: String!, email: String!): User
+    deleteUser(id: Int!): User
+    updateUser(id: Int!, name: String!, email: String!): User
+    }
+`;
+module.exports = typeDefs;
