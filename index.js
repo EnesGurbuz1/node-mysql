@@ -1,50 +1,22 @@
 const express = require('express');
+const { ApolloServer, gql } = require('apollo-server-express');
 const mysql = require('mysql');
-// const graphqlHTTP = require('express-graphql');
-const { graphqlHTTP } = require('express-graphql'); // express-graphql modülü
-const schema = require('./schema');
-
-
 
 const app = express();
 
-// Resolver fonksiyonlarını tanımlayın
-const root = {
-    getUser: ({ id }) => {
-      return new Promise((resolve, reject) => {
-        const query = `SELECT * FROM users WHERE id = ${id}`;
-        db.query(query, (err, results) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(results[0]);
-          }
-        });
-      });
-    },
-    getUsers: () => {
-      return new Promise((resolve, reject) => {
-        const query = 'SELECT * FROM Users';
-        db.query(query, (err, results) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(results);
-          }
-        });
-      });
-    },
-  };
+const typeDefs = gql`
+  type User {
+    id: Int
+    name: String
+    email: String
+  }
 
-// GraphQL endpoint'i
-app.use('/graphql', graphqlHTTP({
-  schema: schema,
-  rootValue: root,
-  graphiql: true
-}));
-  
+  type Query {
+    getUser(id: Int): User
+    getUsers: [User]
+  }
+`;
 
-// MySQL bağlantı bilgilerini burada güncelleyin
 const db = mysql.createConnection({
   host: 'localhost',
   user: 'root',
@@ -52,29 +24,65 @@ const db = mysql.createConnection({
   database: 'basecamp'
 });
 
-// MySQL bağlantısını başlat
-db.connect((err) => {
-  if (err) {
-    throw err;
+const resolvers = {
+  Query: {
+    getUser: ({ id }) => {
+      if (typeof id !== 'number') {
+        throw new Error('Geçerli bir kullanıcı kimliği sağlanmalıdır.');
+      }
+      return new Promise((resolve, reject) => {
+        const query = `SELECT * FROM users WHERE id = ${id}`;
+        db.query(query, (err, results) => {
+          if (err) {
+            reject(err);
+          } else {
+            if (results.length > 0) {
+              const user = {
+                id: results[0].id,
+                name: results[0].name,
+                email: results[0].email
+              };
+              resolve(user);
+            } else {
+              resolve(null);
+            }
+          }
+        });
+      });
+    },
+    getUsers: () => {
+      return new Promise((resolve, reject) => {
+        const query = 'SELECT * FROM users';
+        db.query(query, (err, results) => {
+          if (err) {
+            reject(err);
+          } else {
+            const users = results.map(result => ({
+              id: result.id,
+              name: result.name,
+              email: result.email
+            }));
+            resolve(users);
+          }
+        });
+      });
+    }
   }
-  console.log('MySQL bağlantısı başarıyla sağlandı!');
+};
+
+const server = new ApolloServer({
+  typeDefs,
+  resolvers
 });
 
-// User tablosundaki verileri okuma
-app.get('/users', (req, res) => {
-  const query = 'SELECT * FROM users';
-  db.query(query, (err, results) => {
-    if (err) {
-      throw err;
-    }
-    res.json(results);
+async function startApolloServer() {
+  await server.start();
+  server.applyMiddleware({ app });
+}
+
+startApolloServer().then(() => {
+  const port = 3000;
+  app.listen(port, () => {
+    console.log(`GraphQL sunucusu ${port} portunda çalışıyor.`);
   });
 });
-
-// Sunucuyu başlat
-const port = 3000;
-app.listen(port, () => {
-  console.log(`GraphQL sunucusu ${port} portunda çalışıyor.`);
-});
-
-app.get('/favicon.ico', (req, res) => res.status(204));
